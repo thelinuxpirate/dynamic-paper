@@ -1,4 +1,4 @@
-# dynamic-paper
+# Dynamic-Paper
 A dynamic wallpaper setter for Unix systems.
 
-The program can be ran as a script using scriptisto.
+This Rust program will set your wallpaper according to your time values
