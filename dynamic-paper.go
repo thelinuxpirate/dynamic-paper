@@ -7,58 +7,96 @@ import (
   "errors"
   "os/exec"
   "time"
+  "sort"
   
   "github.com/sevlyar/go-daemon"
-  "github.com/urfave/cli" 
+  "github.com/urfave/cli/v2" 
 )
 
-type DayTimes struct {
+var DesktopSession string = os.Getenv("XDG_SESSION_TYPE")
+
+type LocalTimes struct {
     sunrise int
     day int
     sunset int
     night int
 }
 
-// func determineTime() {
-//  const (
-//    sunriseHour int = 6
-//    dayHour int     = 11
-//    sunsetHour int  = 19
-//    nightHour int   = 20
-//  )
-//
-//  now := time.Now()
-//  currentHour := now.Hour()
-//
-//  var wallpaper string
-//
-//  switch {
-//  case currentHour >= nightHour:
-//    wallpaper = "~/Pictures/Wallpapers/etc/outset-island/night.jpg"
-//     exec.Command("feh", "--bg-fill", wallpaper)
-//    fmt.Println("Wallpaper set to:", wallpaper)
-//  case currentHour >= sunsetHour:
-//    wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
-//     exec.Command("feh", "--bg-fill", wallpaper)
-//    fmt.Println("Wallpaper set to:", wallpaper)
-//  case currentHour >= dayHour:
-//    wallpaper = "~/Pictures/Wallpapers/etc/outset-island/day.png"
-//     exec.Command("feh", "--bg-fill", wallpaper)
-//    fmt.Println("Wallpaper set to:", wallpaper)
-//  case currentHour >= sunriseHour:
-//    wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
-//     exec.Command("feh", "--bg-fill", wallpaper)
-//    fmt.Println("Wallpaper set to:", wallpaper)
-//  }
-//
-// }
-//
-// func main() {
-//  determineTime()
-//
-//  now := time.Now()
-//  fmt.Printf("Current hour: %d\n", now.Hour())
-// }
+func finalizeTime(usrTimes []int) {
+    localTime = LocalTimes{} 
+
+    const (
+        sunriseHour int = 6
+        dayHour int     = 11
+        sunsetHour int  = 19
+        nightHour int   = 20
+    )
+}
+
+
+func processWallpapers(wallPaths []string) {
+    if len(wallPaths) != 4 {
+        fmt.Println("Please provide exactly 4 wallpaper paths.")
+        return
+    }
+
+    for _, wallPath := range Wallpaths {
+        fmt.Println("Loaded wallpaper:", Wallpath)
+    }
+}
+
+func setWallpaper() bool {
+    currentHour := time.Now().Hour()
+
+    var wallprogram, wallpaper string
+
+    if DesktopSession == "x11" {
+        wallprogram = "feh"
+        switch {
+        case currentHour >= nightHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/night.jpg"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= sunsetHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= dayHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/day.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= sunriseHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        }
+    } else if DesktopSession == "wayland" {
+        wallprogram = "swaybg"
+        switch {
+        case currentHour >= nightHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/night.jpg"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= sunsetHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= dayHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/day.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        case currentHour >= sunriseHour:
+            wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
+            exec.Command(wallprogram, "--bg-fill", wallpaper)
+            fmt.Println("Wallpaper set to:", wallpaper)
+        }
+    } else {
+        errors.New("Unable to determine $XDG_SESSION_TYPE...\n(Do you have a 'xdg-desktop-portal' installed?)")
+        return false
+    }
+
+    return true
+}
 
 func activateDaemon() {
     cntxt := &daemon.Context{
@@ -85,31 +123,73 @@ func activateDaemon() {
     log.Print("Reading the current local time")
     log.Print("- - - - - - - - - - - - - - -")
 
-    ticker := time.NewTicker(1 * time.Minute)
+    ticker := time.NewTicker(1 * time.Hour)
     defer ticker.Stop()
 
     for {
         select {
         case <-ticker.C:
-             cmd := exec.Command("echo", "hello world")
-             cmd.Stdout = os.Stdout
-             cmd.Stderr = os.Stderr
-             err := cmd.Run()
-             if err != nil {
-                fmt.Println("Error executing command:", err)
-             }
+            setWallpaper()
+            err := setWallpaper()
+            if err == false {
+                errors.New("Error executing command...")
+            }
         }
     }
 }
 
+// make sure to echo PID & make a function that kills the program using the current PID
+// develop an environment variable for Wallpaper path (DP_WALLPATH)
 func main() {
     app := &cli.App{
         Name:  "dynamic-paper",
         Usage: "Define a wallpaper for the time of day",
         Action: func(*cli.Context) error {
-            return errors.New("Please rerun the program with an argument...")
+            return errors.New("Please rerun the program with an argument...\n(dynamic-paper --help)")
+        },
+        Commands: []*cli.Command{
+            {
+                Name:    "daemon",
+                Aliases: []string{"dm"},
+                Usage:   "Activates the Dynamic-Paper Daemon",
+                Action: func(*cli.Context) error {
+                    activateDaemon()
+                    return nil
+                },
+            },
+            {
+                Name:    "load",
+                Aliases: []string{"l"},
+                Usage:   "Provide a List of 4 Wallpaper Paths for Usage",
+                Action: func(cCtx *cli.Context) error {
+                    if cCtx.NArg() != 4 {
+                        return errors.New("Please provide exactly 4 wallpaper paths")
+                    }
+
+                    paths := cCtx.Args().Slice()
+                    processWallpapers(paths)
+                    return nil
+                },
+            },
+            {
+                Name:    "set-time",
+                Aliases: []string{"st"},
+                Usage:   "Provide a List of 4 Hours (Order: Sunrise, Day, Sunset, Night)",
+                Action: func(cCtx *cli.Context) error {
+                    if cCtx.NArg() != 4 {
+                        return errors.New("Please provide exactly 4 wallpaper paths")
+                    }
+
+                    paths := cCtx.Args().Slice()
+                    processWallpapers(paths)
+                    return nil
+                },
+            },
         },
     }
+
+    sort.Sort(cli.FlagsByName(app.Flags))
+    sort.Sort(cli.CommandsByName(app.Commands))
 
     if err := app.Run(os.Args); err != nil {
         log.Fatal(err)
