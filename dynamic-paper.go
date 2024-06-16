@@ -1,19 +1,19 @@
 package main
 
 import (
-  "fmt"
-  "os"
-  "log"
   "errors"
+  "fmt"
+  "log"
+  "os"
   "os/exec"
-  "time"
   "sort"
-  
+  "strconv"
+  "strings"
+  "time" 
+
   "github.com/sevlyar/go-daemon"
   "github.com/urfave/cli/v2" 
 )
-
-var DesktopSession string = os.Getenv("XDG_SESSION_TYPE")
 
 type LocalTimes struct {
     sunrise int
@@ -22,26 +22,77 @@ type LocalTimes struct {
     night int
 }
 
-func finalizeTime(usrTimes []int) {
-    localTime = LocalTimes{} 
-
-    const (
-        sunriseHour int = 6
-        dayHour int     = 11
-        sunsetHour int  = 19
-        nightHour int   = 20
-    )
+type localPapers struct {
+    sunrise string
+    day string
+    sunset string
+    night string
 }
 
+var DesktopSession string = os.Getenv("XDG_SESSION_TYPE")
+var localTimes LocalTimes
 
-func processWallpapers(wallPaths []string) {
-    if len(wallPaths) != 4 {
-        fmt.Println("Please provide exactly 4 wallpaper paths.")
+var defaultTimes = LocalTimes{
+    sunrise: 6,
+    day:     11,
+    sunset:  19,
+    night:   20,
+}
+
+func detectDefaultWallpapers() {
+    var wallPath string = os.Getenv("DP_WALLPATH")
+    if wallPath == "" {
+       setEnv(0) 
+    } else {
+        fmt.Println("W")
+    }
+}
+
+func setEnv(x int) {
+    if x == 0 {
+        fmt.Println("DP_WALLPATH not detected, would you like to set it?")
+    } else {
+        fmt.Println("Error handeling")
+    }
+}
+
+func finalizeTime(usrTimes string) error {
+    times := strings.Split(usrTimes, ",")
+    if len(times) != 4 {
+        return errors.New("Please provide exactly 4 time values")
+    }
+
+    var err error
+    localTimes.sunrise, err = strconv.Atoi(times[0])
+    if err != nil {
+        return err
+    }
+    localTimes.day, err = strconv.Atoi(times[1])
+    if err != nil {
+        return err
+    }
+    localTimes.sunset, err = strconv.Atoi(times[2])
+    if err != nil {
+        return err
+    }
+    localTimes.night, err = strconv.Atoi(times[3])
+    if err != nil {
+        return err
+    }
+    
+    return nil
+}
+
+func processWallpapers(wallPaths string) {
+    paths := strings.Split(wallPaths, ",")
+    if len(paths) != 4 {
+        fmt.Println("Please provide exactly 4 wallpaper paths")
         return
     }
 
-    for _, wallPath := range Wallpaths {
-        fmt.Println("Loaded wallpaper:", Wallpath)
+    for _, wallPath := range paths {
+      fmt.Println("Loaded wallpaper:", wallPath)
+      log.Print("Loaded wallpaper:", wallPath)
     }
 }
 
@@ -53,19 +104,19 @@ func setWallpaper() bool {
     if DesktopSession == "x11" {
         wallprogram = "feh"
         switch {
-        case currentHour >= nightHour:
+        case currentHour >= localTimes.night:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/night.jpg"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= sunsetHour:
+        case currentHour >= localTimes.sunset:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= dayHour:
+        case currentHour >= localTimes.day:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/day.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= sunriseHour:
+        case currentHour >= localTimes.sunrise:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
@@ -73,19 +124,19 @@ func setWallpaper() bool {
     } else if DesktopSession == "wayland" {
         wallprogram = "swaybg"
         switch {
-        case currentHour >= nightHour:
+        case currentHour >= localTimes.night:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/night.jpg"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= sunsetHour:
+        case currentHour >= localTimes.sunset:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= dayHour:
+        case currentHour >= localTimes.day:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/day.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
-        case currentHour >= sunriseHour:
+        case currentHour >= localTimes.sunrise:
             wallpaper = "~/Pictures/Wallpapers/etc/outset-island/beforeYafter.png"
             exec.Command(wallprogram, "--bg-fill", wallpaper)
             fmt.Println("Wallpaper set to:", wallpaper)
@@ -141,6 +192,7 @@ func activateDaemon() {
 // make sure to echo PID & make a function that kills the program using the current PID
 // develop an environment variable for Wallpaper path (DP_WALLPATH)
 func main() {
+    localTimes = defaultTimes
     app := &cli.App{
         Name:  "dynamic-paper",
         Usage: "Define a wallpaper for the time of day",
@@ -162,11 +214,11 @@ func main() {
                 Aliases: []string{"l"},
                 Usage:   "Provide a List of 4 Wallpaper Paths for Usage",
                 Action: func(cCtx *cli.Context) error {
-                    if cCtx.NArg() != 4 {
-                        return errors.New("Please provide exactly 4 wallpaper paths")
+                    if cCtx.NArg() != 1 {
+                        return errors.New("Please provide a comma-separated list of 4 wallpaper paths")
                     }
 
-                    paths := cCtx.Args().Slice()
+                    paths := cCtx.Args().Get(0)
                     processWallpapers(paths)
                     return nil
                 },
@@ -176,12 +228,23 @@ func main() {
                 Aliases: []string{"st"},
                 Usage:   "Provide a List of 4 Hours (Order: Sunrise, Day, Sunset, Night)",
                 Action: func(cCtx *cli.Context) error {
-                    if cCtx.NArg() != 4 {
-                        return errors.New("Please provide exactly 4 wallpaper paths")
+                    if cCtx.NArg() != 1 {
+                        return errors.New("Please provide a comma-separated list of 4 time values")
                     }
 
-                    paths := cCtx.Args().Slice()
-                    processWallpapers(paths)
+                    usrTimes := cCtx.Args().Get(0)
+                    if err := finalizeTime(usrTimes); err != nil {
+                        return err
+                    }
+                    return nil
+                },
+            },
+            {
+                Name:    "run-me",
+                Aliases: []string{"r"},
+                Usage:   "Im a demo",
+                Action: func(cCtx *cli.Context) error {
+                    detectDefaultWallpapers()
                     return nil
                 },
             },
