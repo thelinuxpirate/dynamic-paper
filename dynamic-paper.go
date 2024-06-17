@@ -324,7 +324,7 @@ func main() {
             {
                 Name:    "load",
                 Aliases: []string{"l"},
-                Usage:   "Loads 4 wallpaers for usage (Order: Sunrise, Day, Sunset, Night)",
+                Usage:   "Loads 4 wallpapers for usage (Order: Sunrise, Day, Sunset, Night)",
                 Action: func(cCtx *cli.Context) error {
                     if cCtx.NArg() != 1 {
                         return errors.New("Please provide a comma-separated list of 4 wallpaper paths")
