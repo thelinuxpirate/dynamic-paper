@@ -1,6 +1,0 @@
-Dynamic-Paper
--------------
-A dynamic wallpaper setter for Unix systems.
-
-A Dynamic Wallpaper setter built with Golang.
-This program will set a wallpaper on X11 & Wayland systems depending on user values
