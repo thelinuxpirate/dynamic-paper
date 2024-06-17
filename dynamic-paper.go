@@ -1,34 +1,35 @@
 package main
 
 import (
-  "errors"
-  "fmt"
-  "log"
-  "os"
-  "os/exec"
-  "os/user"
-  "path/filepath" 
-  "sort"
-  "strconv"
-  "strings"
-  "time" 
+    "errors"
+    "fmt"
+    "log"
+    "os"
+    "os/exec"
+    "os/user"
+    "path/filepath"
+    "sort"
+    "strconv"
+    "strings"
+    "syscall"
+    "time"
 
-  "github.com/sevlyar/go-daemon"
-  "github.com/urfave/cli/v2" 
+    "github.com/sevlyar/go-daemon"
+    "github.com/urfave/cli/v2"
 )
 
 type LocalTimes struct {
     sunrise int
-    day int
-    sunset int
-    night int
+    day     int
+    sunset  int
+    night   int
 }
 
 type LocalPapers struct {
     sunrise string
-    day string
-    sunset string
-    night string
+    day     string
+    sunset  string
+    night   string
 }
 
 var DesktopSession string = os.Getenv("XDG_SESSION_TYPE")
@@ -46,12 +47,11 @@ var defaultTimes = LocalTimes{
 func detectDefaultWallpapers() {
     wallPath = os.Getenv("DP_WALLPATH")
     if wallPath == "" {
-        fmt.Println("$DP_WALLPATH not detected, please set this variable or use the \"load\" command")
-        fmt.Println("$ export DP_WALLPATH=\"$HOME/YOURPATH/\"\nOr set via your shellrc file")
+        log.Println("$DP_WALLPATH not detected, please set this variable or use the \"load\" command")
+        log.Println("$ export DP_WALLPATH=\"$HOME/YOURPATH/\"\nOr set via your shellrc file")
         errors.New("ABORTING PROGRAM")
     } else {
-        log.Print("Using wallpaper path from $DP_WALLPATH:", wallPath)
-        fmt.Println("Using wallpaper path from $DP_WALLPATH:", wallPath)
+        log.Println("Using wallpaper path from $DP_WALLPATH:", wallPath)
         loadDefaultWallpapers()
         setWallpaper()
     }
@@ -60,35 +60,33 @@ func detectDefaultWallpapers() {
 func loadDefaultWallpapers() {
     err := filepath.Walk(wallPath, func(path string, info os.FileInfo, err error) error {
         if err != nil {
-        return err
-    }
-
-    if !info.IsDir() {
-        lowerName := strings.ToLower(info.Name())
-        switch {
-        case strings.Contains(lowerName, "sunrise"):
-            localPapers.sunrise = path
-        case strings.Contains(lowerName, "day"):
-            localPapers.day = path
-        case strings.Contains(lowerName, "sunset"):
-            localPapers.sunset = path
-        case strings.Contains(lowerName, "night"):
-            localPapers.night = path
+            return err
         }
-    }
-    return nil
-  })
+
+        if !info.IsDir() {
+            lowerName := strings.ToLower(info.Name())
+            switch {
+            case strings.Contains(lowerName, "sunrise"):
+                localPapers.sunrise = path
+            case strings.Contains(lowerName, "day"):
+                localPapers.day = path
+            case strings.Contains(lowerName, "sunset"):
+                localPapers.sunset = path
+            case strings.Contains(lowerName, "night"):
+                localPapers.night = path
+            }
+        }
+        return nil
+    })
 
     if err != nil {
         log.Fatalf("Error loading default wallpapers: %v", err)
     }
-    log.Print("Loaded wallpapers: %+v\n", localPapers)
-    fmt.Printf("Loaded wallpapers: %+v\n", localPapers)
+    log.Printf("Loaded wallpapers: %+v\n", localPapers)
 }
 
-
 func expandPath(path string) string {
-    if path[:2] == "~/" {
+    if strings.HasPrefix(path, "~/") {
         usr, err := user.Current()
         if err != nil {
             log.Fatal(err)
@@ -123,8 +121,7 @@ func processWallpapers(wallPaths string) {
     }
 
     for i, wallPath := range paths {
-        fmt.Println("Loaded wallpaper:", wallPath)
-        log.Print("Loaded wallpaper:", i, "", wallPath)
+        log.Printf("Loaded wallpaper %d: %s", i, wallPath)
     }
     setWallpaper()
 }
@@ -152,7 +149,7 @@ func finalizeTime(usrTimes string) error {
     if err != nil {
         return err
     }
-    
+
     return nil
 }
 
@@ -165,7 +162,7 @@ func setWallpaper() bool {
         wallprogram = "feh"
         switch {
         case currentHour >= localTimes.night:
-            wallpaper = expandPath(localPapers.night) 
+            wallpaper = expandPath(localPapers.night)
         case currentHour >= localTimes.sunset:
             wallpaper = expandPath(localPapers.sunset)
         case currentHour >= localTimes.day:
@@ -177,7 +174,7 @@ func setWallpaper() bool {
         wallprogram = "swaybg"
         switch {
         case currentHour >= localTimes.night:
-            wallpaper = expandPath(localPapers.night) 
+            wallpaper = expandPath(localPapers.night)
         case currentHour >= localTimes.sunset:
             wallpaper = expandPath(localPapers.sunset)
         case currentHour >= localTimes.day:
@@ -186,7 +183,7 @@ func setWallpaper() bool {
             wallpaper = expandPath(localPapers.sunrise)
         }
     } else {
-        errors.New("Unable to determine $XDG_SESSION_TYPE...\n(Do you have a 'xdg-desktop-portal' installed?)")
+        log.Println("Unable to determine $XDG_SESSION_TYPE. Do you have 'xdg-desktop-portal' installed?")
         return false
     }
 
@@ -195,22 +192,31 @@ func setWallpaper() bool {
     } else if wallprogram == "swaybg" {
         args = "-i"
     } else {
-        errors.New("Unable to detect your wallpaper program")
-        log.Println("Honesly dont know what happened... UNEXPECTED ERROR")
+        log.Println("Unable to detect your wallpaper program")
+        return false
     }
 
     cmd := exec.Command(wallprogram, args, wallpaper)
     cmdOutput, err := cmd.CombinedOutput()
+    log.Printf("%s %s %s", wallprogram, args, wallpaper)
     if err != nil {
-        log.Println("Error executing command:", err)
-        log.Println("Command output:", string(cmdOutput))
-        fmt.Println("Error executing command:", err)
-        fmt.Println("Command output:", string(cmdOutput))
+        log.Printf("Error executing command: %v", err)
+        log.Printf("Command output: %s", string(cmdOutput))
         return false
     }
-    log.Print("Wallpaper set to:", wallpaper)
-    fmt.Println("Wallpaper set to:", wallpaper)
+    log.Printf("Wallpaper set to: %s", wallpaper)
     return true
+}
+
+
+func isDesktopSessionActive() bool {
+    cmd := exec.Command("loginctl", "show-session", os.Getenv("XDG_SESSION_ID"), "-p", "Active")
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        log.Println("Error checking session active status:", err)
+        return false
+    }
+    return strings.Contains(string(output), "yes")
 }
 
 func activateDaemon() {
@@ -255,19 +261,41 @@ func activateDaemon() {
     log.Print("Reading the current local time")
     log.Print("- - - - - - - - - - - - - - -")
 
-    ticker := time.NewTicker(1 * time.Hour)
-    defer ticker.Stop()
+    detectDefaultWallpapers()
+    setWallpaper() 
+
+    initialTicker := time.NewTicker(10 * time.Second)
+    stopChan := make(chan bool)
+
+    go func() {
+        for i := 0; i < 10; i++ {
+            <-initialTicker.C
+            setWallpaper()
+        }
+        initialTicker.Stop()
+        stopChan <- true
+    }()
+
+    <-stopChan
+
+    hourlyTicker := time.NewTicker(1 * time.Hour)
+    defer hourlyTicker.Stop()
 
     for {
         select {
-        case <-ticker.C:
-            detectDefaultWallpapers() 
+        case <-hourlyTicker.C:
+            detectDefaultWallpapers()
+            setWallpaper()
         }
     }
 }
 
 func killDaemon() {
     homeDir, err := os.UserHomeDir()
+    if err != nil {
+        log.Fatal("Unable to get user home directory: ", err)
+    }
+
     daemonDir := filepath.Join(homeDir, ".local", "share", "dynamic-paper")
     pidFile := filepath.Join(daemonDir, "dynamic-paper.pid")
     data, err := os.ReadFile(pidFile)
@@ -285,13 +313,20 @@ func killDaemon() {
         log.Fatalf("Unable to find process: %v", err)
     }
 
-    err = proc.Kill()
-    if err != nil {
-        log.Fatalf("Failed to kill process: %v", err)
+    err = proc.Signal(syscall.Signal(0))
+    if err == nil {
+        err = proc.Kill()
+        if err != nil {
+            log.Fatalf("Failed to kill process: %v", err)
+        }
+        fmt.Printf("Killed daemon with PID %d\n", pid)
+        os.Remove(pidFile)
+    } else if err.Error() == "no such process" {
+        fmt.Println("Daemon process already terminated")
+        os.Remove(pidFile)
+    } else {
+        log.Fatalf("Error checking process: %v", err)
     }
-
-    fmt.Printf("Killed daemon with PID %d\n", pid)
-    os.Remove(pidFile)
 }
 
 func main() {
