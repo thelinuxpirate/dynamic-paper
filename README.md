@@ -34,6 +34,7 @@ This enables usage with the program to be set at the start of your system like i
 #### How to set
 There are multiple ways to set an environment variable but I'll document two here:
 - In your shell rc (recommended)
+
 You can set this path in your shell's rc being `.bashrc` if you use Bash or `.zshrc` if you use the Zsh shell.
 ```sh
 # Code goes here
@@ -41,6 +42,7 @@ export DP_WALLPATH="$HOME/YOURFILEPATHHERE/"
 # Maybe some here too
 ```
 - Locally in your current terminal session
+
 By doing this you set the variable only for use in your current terminal session:
 ```
 $ export DP_WALLPATH="$HOME/YOURFILEPATHHERE/"
